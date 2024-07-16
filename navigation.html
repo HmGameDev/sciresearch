@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC Advanced Navigator - Navigation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css">
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #ecf0f3;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .leaflet-control-attribution {
+            display: none;
+        }
+    </style>
+</head>
+<body onload="initNavigationMap()">
+<div id="map"></div>
+<script>
+    let map, userMarker, userCircle, routingControl;
+    let obstacleLayer = L.layerGroup();
+    let obstacles = JSON.parse(localStorage.getItem('obstacles')) || [];
+    let destinationLatLng = JSON.parse(localStorage.getItem('destination'));
+
+    function initNavigationMap() {
+        map = L.map('map').setView([40.712776, -74.005974], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        obstacleLayer.addTo(map);
+
+        obstacles.forEach(obstacle => {
+            L.circle(obstacle.latlng, {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.5,
+                radius: 2.13 // 7 feet in meters
+            }).addTo(obstacleLayer).bindPopup(obstacle.name);
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(updateLocation, locationError, {
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 5000
+            });
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+
+        if (destinationLatLng) {
+            routingControl = L.Routing.control({
+                waypoints: [],
+                createMarker: function() { return null; },
+                routeWhileDragging: true,
+                router: L.Routing.osrmv1({
+                    serviceUrl: 'https://router.project-osrm.org/route/v1'
+                })
+            }).addTo(map);
+        }
+    }
+
+    function updateLocation(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        if (userMarker) {
+            userMarker.setLatLng([latitude, longitude]);
+            userCircle.setLatLng([latitude, longitude]);
+            userCircle.setRadius(2.13); // 7 feet in meters
+        } else {
+            userMarker = L.marker([latitude, longitude], {icon: L.icon({
+                iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Location_dot_blue.svg/1024px-Location_dot_blue.svg.png',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })}).addTo(map);
+            
+            userCircle = L.circle([latitude, longitude], {
+                color: '#1e90ff',
+                fillColor: '#1e90ff',
+                fillOpacity: 0.2,
+                radius: 2.13 // 7 feet in meters
+            }).addTo(map);
+        }
+
+        if (destinationLatLng) {
+            routingControl.setWaypoints([
+                L.latLng(latitude, longitude),
+                L.latLng(destinationLatLng[0], destinationLatLng[1])
+            ]);
+        }
+    }
+
+    function locationError(error) {
+        console.error(`Error getting location: ${error.message}`);
+    }
+</script>
+</body>
+</html>
